@@ -17,18 +17,28 @@ def get_drive_service():
 
 def create_folder(name, parent_id):
     service = get_drive_service()
-    query = f"'{parent_id}' in parents and name='{name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+
+    # Check if folder already exists
+    query = (
+        f"'{parent_id}' in parents and "
+        f"name='{name}' and "
+        "mimeType='application/vnd.google-apps.folder' and trashed=false"
+    )
     results = service.files().list(q=query, fields="files(id)").execute()
     if results['files']:
         return results['files'][0]['id']
 
+    # ✅ Create folder under shared parent
     metadata = {
         'name': name,
         'mimeType': 'application/vnd.google-apps.folder',
-        'parents': [parent_id]  # ← MUST be your shared folder ID
+        'parents': [parent_id]  # ← this must be the shared folder's ID
     }
     folder = service.files().create(body=metadata, fields='id').execute()
+
+    print(f"✅ Created folder: {name} under parent {parent_id}")
     return folder['id']
+
 
 
 
