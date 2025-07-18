@@ -17,8 +17,8 @@ load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split(",")))
 TRAININGS_FOLDER_ID = os.getenv("TRAININGS_FOLDER_ID")
+COMPETITIONS_FOLDER_ID = os.getenv("COMPETITIONS_FOLDER_ID")
 STATE_FILE = "state.json"
-
 
 # === STATE MGMT ===
 def load_state():
@@ -31,18 +31,17 @@ def save_state(state):
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
-
 # === ADMIN COMMANDS ===
 async def start_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id not in ADMIN_IDS:
         return await update.message.reply_text("⛔ You are not authorized.")
 
-    await update.message.reply_text("📁 Send the folder name for this event:")
+    await update.message.reply_text("📁 Send the event folder name (it will be created under 'Competitions'):")
     return 1
 
 async def receive_event_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    name = update.message.text
-    folder_id = create_folder(name, TRAININGS_FOLDER_ID)
+    name = update.message.text.strip()
+    folder_id = create_folder(name, COMPETITIONS_FOLDER_ID)
     save_state({"active_event": folder_id})
     await update.message.reply_text(f"✅ Event started. Folder: *{name}*", parse_mode="Markdown")
     return ConversationHandler.END
@@ -54,7 +53,6 @@ async def end_event(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛑 Event ended.")
     return
 
-
 # === VIDEO HANDLER ===
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     video = update.message.video or update.message.document
@@ -64,20 +62,15 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     print(f"📥 Video from {user.username or user.first_name}")
 
-    # Download to temp file
     file = await context.bot.get_file(video.file_id)
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
         await file.download_to_drive(f.name)
         local_path = f.name
 
-    # Respond immediately to avoid Telegram timeout
     await update.message.reply_text("📤 Uploading to Drive in background...")
-
-    # Async background task
     asyncio.create_task(upload_to_drive(local_path))
 
-
-# === ASYNC UPLOAD TASK ===
+# === ASYNC BACKGROUND TASK ===
 async def upload_to_drive(local_path):
     try:
         state = load_state()
@@ -88,7 +81,7 @@ async def upload_to_drive(local_path):
             today = datetime.date.today().isoformat()
             folder_id = create_folder(today, TRAININGS_FOLDER_ID)
 
-        print(f"📁 Uploading {local_path} to folder {folder_id}")
+        print(f"📤 Uploading to folder {folder_id}")
         upload_video(local_path, folder_id)
 
     except Exception as e:
@@ -96,12 +89,10 @@ async def upload_to_drive(local_path):
     finally:
         os.remove(local_path)
 
-
 # === MAIN ENTRY ===
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # Conversation to start an event
     start_conv = ConversationHandler(
         entry_points=[CommandHandler("start_event", start_event)],
         states={1: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_event_name)]},
@@ -117,4 +108,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
