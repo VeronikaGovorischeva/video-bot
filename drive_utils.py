@@ -25,10 +25,11 @@ def create_folder(name, parent_id):
     metadata = {
         'name': name,
         'mimeType': 'application/vnd.google-apps.folder',
-        'parents': [parent_id]
+        'parents': [parent_id]  # ← MUST be your shared folder ID
     }
     folder = service.files().create(body=metadata, fields='id').execute()
     return folder['id']
+
 
 
 def upload_video(local_path, folder_id):
